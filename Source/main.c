@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -17,15 +18,47 @@
 #define TRUE 1
 #define FALSE 0
 
+//GAME STATES...
+#define MENU         0b1 
+#define GET_READY   0b10 
+#define IN_GAME    0b100 
+#define RESULT    0b1000 
+
+//PLAYER STATES...
+#define PLAYERS_NOT_READY   0b0
+#define PLAYER_1_READY      0b1
+#define PLAYER_2_READY      0b10
+
+//SCREEN RESOLUTION...
+#define SCREEN_RES_HEIGHT       600
+#define SCREEN_RES_WIDTH        800
+
+//PADDLE DIMENSIONS...
+#define PADDLE_WIDTH            16 
+#define PADDLE_HEIGHT           128 
+
+//PADDLE POSITION...
+#define PADDLE01_DEFAULT_X_POS  100 - (PADDLE_WIDTH * 0.5) 
+#define PADDLE01_DEFAULT_Y_POS  (SCREEN_RES_HEIGHT * 0.5) - (PADDLE_HEIGHT * 0.5)
+
+#define PADDLE02_DEFAULT_X_POS  SCREEN_RES_WIDTH - 100 - (PADDLE_WIDTH * 0.5)
+#define PADDLE02_DEFAULT_Y_POS  (SCREEN_RES_HEIGHT * 0.5) - (PADDLE_HEIGHT * 0.5)
+
 typedef struct Speed{
-    int x;
-    int y;
+    float x;
+    float y;
 } Speed;
 
 typedef struct Pos{
     int x;
     int y;
 } Pos;
+
+typedef struct TextObject{
+    SDL_Texture * texture;
+    char * text;
+    SDL_Rect rect;
+}TextObject;
 
 uint8_t CheckCollision(SDL_Rect a, SDL_Rect b)
 {
@@ -46,12 +79,19 @@ uint8_t CheckCollision(SDL_Rect a, SDL_Rect b)
     return 0;
 }
 
-int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost);
+int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost, char *playerState, 
+        SDL_Rect *paddle01, SDL_Rect *paddle02);
 
 void IncreaseScore(int *score, char * scoreText);
 
-int RenderText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer *renderer,
-        SDL_Texture *fontTexture, int x, int y);
+int InitializeText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer *renderer,
+        SDL_Texture **fontTexture, int x, int y, SDL_Rect *fontRect);
+
+void HandleGameStateMenu(char * gameState);
+
+void HandleReadyState(char * gameState, char playerState);
+
+int CreateFont(TTF_Font **font, unsigned int fontSize);
 
 int main(int argc, char **argv)
 {
@@ -62,21 +102,19 @@ int main(int argc, char **argv)
     SDL_Rect paddle02;
     SDL_Rect ball;
 
-    Speed ballSpeed = {5, 5};
+    Speed ballSpeed = {350, 150};
 
     Speed currentBallSpeed = {
         ballSpeed.x, 
         0};
 
-    float paddleSpeed = 10;
-    float currentPaddleSpeed01 = paddleSpeed;
-    float currentPaddleSpeed02 = paddleSpeed;
-    
-    int scoreP1 = 0;
-    char scoreP1Text[2] = "0";
+    char gameState = MENU; //initialize to MENU game state...
+     //initialize to MENU game state...
 
-    int scoreP2= 0;
-    char scoreP2Text[2] = "0";
+    char playerState = 0; 
+
+    float paddleSpeed = 350;
+    float ballBoost = 1;
 
     uint8_t paddle01State = PADDLE_STATE_NONE;
     uint8_t paddle02State = PADDLE_STATE_NONE;
@@ -85,13 +123,15 @@ int main(int argc, char **argv)
 
     uint8_t isRunning = 1;      
 
-    int startFrameTime = 0;
-    int endFrameTime = 0;
-    int deltaTime = 0;
-    float ballBoost = 1;
+    const double targetFPS = 16.66;
+    int frameCounter = 0;
+    double fpsCollector = 0;
+    uint32_t startFrameTime = 0;
+    uint32_t currentFrameTime = 0;
+    uint32_t frameTime = 0;
+    float deltaTime = 0;
 
     printf("Pong Initialized!\n");
-    printf("With TTF...");
 
     if(SDL_Init(SDL_INIT_VIDEO) < 0){
         printf("Unable to initialize SDL!\n");
@@ -108,7 +148,7 @@ int main(int argc, char **argv)
     }
 
     //Creates renderer...
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC );
 
     if(renderer == NULL)
     {
@@ -126,38 +166,83 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    TTF_Font *font =  TTF_OpenFont("../Resources/ARCADECLASSIC.TTF", 59);
+    TTF_Font *fontMedium =  NULL;
+    TTF_Font *fontSmall =  NULL;
 
-    if(font == NULL)
+    if(CreateFont(&fontMedium, 30) == FALSE)
     {
-        printf("Unable to initialize the font!\n");
+        return 1;
+    }
+
+    if(CreateFont(&fontSmall, 15) == FALSE)
+    {
         return 1;
     }
 
     SDL_Color fontColor = {WHITE};
-    SDL_Texture *fontTexture = NULL;
+
+    TextObject p1ReadyText = {NULL, "Press 'W'", {0}};
+
+    InitializeText(fontSmall, p1ReadyText.text, fontColor, renderer, &p1ReadyText.texture, 800 * 0.25, 500, &p1ReadyText.rect);
+
+    TextObject p2ReadyText = {NULL, "Press 'UP'", {0}};
+
+    InitializeText(fontSmall, p2ReadyText.text, fontColor, renderer, &p2ReadyText.texture, 800 * 0.75, 500, &p2ReadyText.rect);
+
+    TextObject p1ReadyPromptText = {NULL, "Ready?", {0}};
+
+    InitializeText(fontSmall, p1ReadyPromptText.text, fontColor, renderer, &p1ReadyPromptText.texture, 800 * 0.25, 450, &p1ReadyPromptText.rect);
+
+    TextObject p2ReadyPromptText = {NULL, "Ready?", {0}};
+
+    InitializeText(fontSmall, p2ReadyPromptText.text, fontColor, renderer, &p2ReadyPromptText.texture, 800 * 0.75, 450, &p2ReadyPromptText.rect);
+
+    SDL_Texture *scoreP1FontTexture = NULL;
+    SDL_Rect scoreP1FontRect = {0};
+    int scoreP1 = 0;
+    char scoreP1Text[2] = "0";
+
+    InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
+
+    SDL_Texture *scoreP2FontTexture = NULL;
+    SDL_Rect scoreP2FontRect = {0};
+    int scoreP2= 0;
+    char scoreP2Text[2] = "0";
+
+    InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 800-200, 50, &scoreP2FontRect);
+
+    SDL_Texture *fpsFontTexture = NULL;
+    SDL_Rect fpsFontRect = {0};
+    double fps = 0;
+    char fpsText[1000] = "0";
+
+    //InitializeText(font, fpsText, fontColor, renderer, &fpsFontTexture, 500, 100, &fpsFontRect);
 
     //------------------------------------------------------------------
 
-    paddle01.w = 16; 
-    paddle01.h = 128;
-    paddle01.x = 100;
-    paddle01.y = (600 * 0.5) - (128 * 0.5);
+    paddle01.w = PADDLE_WIDTH; 
+    paddle01.h = PADDLE_HEIGHT;
+    paddle01.x = PADDLE01_DEFAULT_X_POS; 
+    paddle01.y = PADDLE01_DEFAULT_Y_POS;
 
-    paddle02.w = 16; 
-    paddle02.h = 128;
-    paddle02.x = 800 - 100;
-    paddle02.y = (600 * 0.5) - (128 * 0.5);
+    paddle02.w = PADDLE_WIDTH; 
+    paddle02.h = PADDLE_HEIGHT;
+    paddle02.x = PADDLE02_DEFAULT_X_POS; 
+    paddle02.y = PADDLE02_DEFAULT_Y_POS; 
 
     ball.w = 16;
     ball.h = 16;
     ball.x = 800 * 0.5;
     ball.y = (600 * 0.5) - (128 * 0.5);
    
+    startFrameTime = SDL_GetTicks();
     while(isRunning)
     {
-        startFrameTime = SDL_GetTicks();
 
+        currentFrameTime = SDL_GetTicks();
+        /*-----------------------------------------------------------------------------------
+        INPUT...
+        --------------------------------------------------------------------------------------*/
         while(SDL_PollEvent(&event))
         {
             if(event.type == SDL_QUIT)
@@ -170,6 +255,9 @@ int main(int argc, char **argv)
             {
                 if(event.key.keysym.sym == SDLK_w)
                 {
+                    if(gameState == GET_READY)
+                        playerState |= PLAYER_1_READY;
+
                     paddle01State = PADDLE_STATE_UP;
                 } 
 
@@ -180,6 +268,9 @@ int main(int argc, char **argv)
 
                 if(event.key.keysym.sym == SDLK_UP)
                 {
+                    if(gameState == GET_READY)
+                        playerState |= PLAYER_2_READY;
+
                     paddle02State = PADDLE_STATE_UP;
                 }
 
@@ -201,96 +292,130 @@ int main(int argc, char **argv)
                 }
             }
         }
+        /*----------------------------------------------------------------------------------------
+        GAME-LOGIC     
+        ----------------------------------------------------------------------------------------*/
 
-        if(paddle01State == PADDLE_STATE_UP) 
-        {
-            if(paddle01.y > 0)
-                paddle01.y -= paddleSpeed; 
-        }
-        else if (paddle01State == PADDLE_STATE_DOWN)
-        {
-            if(paddle01.y < 600 - paddle01.h)
-                paddle01.y += paddleSpeed; 
-        }
+        //Handle Menu State...
+        HandleGameStateMenu(&gameState); 
 
-        if(paddle02State == PADDLE_STATE_UP)
-        {
-            if(paddle02.y > 0)
-                paddle02.y -= paddleSpeed;
-        }
-        else if (paddle02State == PADDLE_STATE_DOWN)
-        {
-            if(paddle02.y < 600 - paddle02.h)
-                paddle02.y += paddleSpeed; 
-        }
+        //Handle Ready State...
+        HandleReadyState(&gameState, playerState);
 
-        //Calculate upper bound and lower bounds of the screen...
-        if(ball.y < 0) 
-        {
-            currentBallSpeed.y = ballSpeed.y;
-        } 
-        else if(ball.y + ball.h > 600)
-        {
-            currentBallSpeed.y = -ballSpeed.y;
-        }
-
-        if(ball.x < 0)
-        {
-            if(ResetData(&ball, &currentBallSpeed, &ballBoost) == FALSE)
+        if(gameState != GET_READY)
+        { 
+            //Player 01 Paddle movement...
+            if(paddle01State == PADDLE_STATE_UP) 
             {
-                printf("Unable to reset data...\n");
+                if(paddle01.y > 0)
+                    paddle01.y -= paddleSpeed * deltaTime; 
             }
-            IncreaseScore(&scoreP2, scoreP2Text);
-        } 
-        if ( ball.x + ball.w > 800)
-        {
-            if(ResetData(&ball, &currentBallSpeed, &ballBoost) == FALSE)
+            else if (paddle01State == PADDLE_STATE_DOWN)
             {
-                printf("Unable to reset data...\n");
+                if(paddle01.y < 600 - paddle01.h)
+                    paddle01.y += paddleSpeed * deltaTime; 
             }
-            IncreaseScore(&scoreP1, scoreP1Text);
+
+            if(paddle02State == PADDLE_STATE_UP)
+            {
+                if(paddle02.y > 0)
+                    paddle02.y -= paddleSpeed * deltaTime;
+            }
+            else if (paddle02State == PADDLE_STATE_DOWN)
+            {
+                if(paddle02.y < 600 - paddle02.h)
+                    paddle02.y += paddleSpeed * deltaTime; 
+            }
+
+            if(ball.y < 0) 
+            {
+                currentBallSpeed.y = ballSpeed.y;
+            } 
+            else if(ball.y + ball.h > 600)
+            {
+                currentBallSpeed.y = -ballSpeed.y;
+            }
+
+            //Increase score...
+            if(ball.x < 0)
+            {
+                if(ResetData(&ball, &currentBallSpeed, &ballBoost, &playerState, &paddle01, &paddle02) 
+                        == FALSE)
+                {
+                    printf("Unable to reset data...\n");
+                }
+
+                IncreaseScore(&scoreP2, scoreP2Text);
+
+                InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 800-200, 50, &scoreP2FontRect);
+            } 
+
+            if ( ball.x + ball.w > 800)
+            {
+                if(ResetData(&ball, &currentBallSpeed, &ballBoost, &playerState, &paddle01, &paddle02) 
+                        == FALSE)
+                {
+                    printf("Unable to reset data...\n");
+                }
+                IncreaseScore(&scoreP1, scoreP1Text);
+
+                InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
+            }
+
+            if(CheckCollision(ball,paddle02)) 
+            {
+                ballBoost +=0.1 ;
+                currentBallSpeed.x = -ballSpeed.x - ballBoost;
+
+                //Bounce ball diagonally...
+                if(ball.y > paddle02.y && ball.y < paddle02.y + (paddle02.h * 0.5))
+                {
+                    currentBallSpeed.y = -ballSpeed.y - ballBoost; 
+                }else 
+                {
+                    currentBallSpeed.y = ballSpeed.y + ballBoost;
+                }
+            }
+
+            if(CheckCollision(ball, paddle01) == 1)
+            {
+
+                ballBoost += 0.1;
+                currentBallSpeed.x = ballSpeed.x + ballBoost;
+
+                if(ball.y > paddle01.y && ball.y < paddle01.y + (paddle01.h * 0.5))
+                {
+                    currentBallSpeed.y = -ballSpeed.y - ballBoost; 
+                }else 
+                {
+                    currentBallSpeed.y = ballSpeed.y + ballBoost;
+                }
+            }
+
+            ball.x += currentBallSpeed.x * deltaTime;
+            ball.y += currentBallSpeed.y * deltaTime;
         }
 
-        if(CheckCollision(ball,paddle02)) 
-        {
-            ballBoost +=0.1 ;
-            currentBallSpeed.x = -ballSpeed.x - ballBoost;
-
-            if(ball.y > paddle02.y && ball.y < paddle02.y + (paddle02.h * 0.5))
-            {
-                currentBallSpeed.y = -ballSpeed.y - ballBoost; 
-            }else 
-            {
-                currentBallSpeed.y = ballSpeed.y + ballBoost;
-            }
-        }
-
-        if(CheckCollision(ball, paddle01) == 1)
-        {
-
-            ballBoost += 0.1;
-            currentBallSpeed.x = ballSpeed.x + ballBoost;
-
-            if(ball.y > paddle01.y && ball.y < paddle01.y + (paddle01.h * 0.5))
-            {
-                currentBallSpeed.y = -ballSpeed.y - ballBoost; 
-            }else 
-            {
-                currentBallSpeed.y = ballSpeed.y + ballBoost;
-            }
-        }
-
-        ball.x += currentBallSpeed.x;
-        ball.y += currentBallSpeed.y;
-
-        //Render...
+        /*-----------------------------------------------------------------------------------------
+        //RENDER LOOP...
+        ----------------------------------------------------------------------------------------- */
+         
         SDL_SetRenderDrawColor(renderer, GREY);
         SDL_RenderClear(renderer);
-
+    
         SDL_SetRenderDrawColor(renderer, WHITE);
+        
+        SDL_RenderCopy(renderer, scoreP1FontTexture, NULL, &scoreP1FontRect);
+        SDL_RenderCopy(renderer, scoreP2FontTexture, NULL, &scoreP2FontRect);
 
-        RenderText(font, scoreP1Text, fontColor, renderer, fontTexture, 200, 50);
-        RenderText(font, scoreP2Text, fontColor, renderer, fontTexture, 800-200, 50);
+        if(gameState == GET_READY)
+        {
+            SDL_RenderCopy(renderer, p1ReadyPromptText.texture, NULL, &p1ReadyPromptText.rect);
+            SDL_RenderCopy(renderer, p1ReadyText.texture, NULL, &p1ReadyText.rect);
+
+            SDL_RenderCopy(renderer, p2ReadyPromptText.texture, NULL, &p2ReadyPromptText.rect);
+            SDL_RenderCopy(renderer, p2ReadyText.texture, NULL, &p2ReadyText.rect);
+        }
 
         SDL_RenderFillRect(renderer, &paddle01);
         SDL_RenderFillRect(renderer, &paddle02);
@@ -301,21 +426,33 @@ int main(int argc, char **argv)
 
         SDL_RenderPresent(renderer);
 
-        endFrameTime = SDL_GetTicks();
+        deltaTime = (currentFrameTime - startFrameTime) * 0.001f;
+        //printf("DeltaTime: %f\n", deltaTime);
 
-        deltaTime = endFrameTime - startFrameTime;
+        frameTime = SDL_GetTicks() - currentFrameTime;
+        fpsCollector += frameTime;
+        startFrameTime = currentFrameTime;
 
-        if(deltaTime < 16.66)
+        frameCounter++;
+        if(frameCounter >= 100)
         {
-            SDL_Delay(16.66 - deltaTime); 
+            printf("Raw FPS: %.2f\n\n", 100/(fpsCollector * 0.001f));
+           
+            frameCounter = 0;
+            fpsCollector = 0;
+        }
+        if(frameTime < targetFPS)
+        {
+            SDL_Delay(targetFPS - frameTime); 
         }
     }
 
     //Clean up...
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-    TTF_CloseFont(font);
-    SDL_DestroyTexture(fontTexture);
+    TTF_CloseFont(fontMedium);
+    SDL_DestroyTexture(scoreP1FontTexture);
+    SDL_DestroyTexture(scoreP2FontTexture);
     return 0;
 }
 
@@ -328,13 +465,12 @@ void IncreaseScore(int *score, char * scoreText)
         printf("Somebody wins!\n");
         return;
     }
-
     scoreText[0] = 48 + (*score);
 }
 
 
-int RenderText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer *renderer, 
-        SDL_Texture *fontTexture, int x, int y)
+int InitializeText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer *renderer, 
+        SDL_Texture **fontTexture, int x, int y, SDL_Rect *fontRect)
 {
     SDL_Color fontColor = {WHITE};
 
@@ -345,29 +481,74 @@ int RenderText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer *ren
         return FALSE;
     }
 
-    fontTexture = SDL_CreateTextureFromSurface(renderer, fontSurface);
+    *fontTexture = SDL_CreateTextureFromSurface(renderer, fontSurface);
     if(fontTexture == NULL)
     {
         printf("Font texture initialization error!\n");
         return FALSE;
     }
 
-    SDL_Rect fontRect = { x, y, fontSurface->w, fontSurface->h};
+    fontRect->x = x; //Center align the text...
+    fontRect->y = y;
+    fontRect->w  = fontSurface->w;
+    fontRect->h = fontSurface->h;
+
+    fontRect->x -= fontRect->w * 0.5; //Center align the text...
 
     SDL_FreeSurface(fontSurface);
-
-    SDL_RenderCopy(renderer, fontTexture, NULL, &fontRect);
 
     return TRUE;
 }
 
-int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost)
+void HandleReadyState(char * gameState, char playerState)
+{
+    if((*gameState) == GET_READY)
+    {
+        //If both players are ready...
+        if(playerState & PLAYER_1_READY && playerState & PLAYER_2_READY)
+        {
+            *gameState = IN_GAME;
+        }
+    }
+}
+
+void HandleGameStateMenu(char * gameState)
+{
+    //Set game state to READY...
+    (*gameState) =  GET_READY; 
+}
+
+int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost,char * playerState
+        ,SDL_Rect *paddle01, SDL_Rect *paddle02)
 {
     ball->x = 800 * 0.5 - ball->w * 0.5;
     ball->y = 600 * 0.5 - ball->h * 0.5;
 
     currentBallSpeed->y = 0;
-    currentBallSpeed->x = 5;
+    currentBallSpeed->x = 350;
 
     (*ballBoost) = 1;
+
+    *playerState = PLAYERS_NOT_READY;
+
+    paddle01->x = PADDLE01_DEFAULT_X_POS; 
+    paddle01->y = PADDLE01_DEFAULT_Y_POS; 
+
+    paddle02->x = PADDLE02_DEFAULT_X_POS; 
+    paddle02->y = PADDLE02_DEFAULT_Y_POS; 
+
+    return TRUE;
+}
+
+int CreateFont(TTF_Font **font, unsigned int fontSize)
+{
+    *font = TTF_OpenFont("../Resources/8-bit-pusab.ttf", fontSize); 
+
+    if(font == NULL)
+    {
+        printf("Error: Unable to initialize font! | ERROR: %s\n", SDL_GetError());
+        return FALSE;
+    }
+
+    return TRUE;
 }
