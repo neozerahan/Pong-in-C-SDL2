@@ -18,6 +18,8 @@
 #define TRUE 1
 #define FALSE 0
 
+#define GAME_POINT 1
+
 //GAME STATES...
 #define MENU         0b1 
 #define GET_READY   0b10 
@@ -82,7 +84,7 @@ uint8_t CheckCollision(SDL_Rect a, SDL_Rect b)
 int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost, char *playerState, 
         SDL_Rect *paddle01, SDL_Rect *paddle02);
 
-void IncreaseScore(int *score, char * scoreText);
+void IncreaseScore(int *score, char * scoreText, char *gameState);
 
 int InitializeText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer *renderer,
         SDL_Texture **fontTexture, int x, int y, SDL_Rect *fontRect);
@@ -181,22 +183,46 @@ int main(int argc, char **argv)
 
     SDL_Color fontColor = {WHITE};
 
+    //-------------------------------------------------------------------------------------------//
+    //
     TextObject p1ReadyText = {NULL, "Press 'W'", {0}};
 
     InitializeText(fontSmall, p1ReadyText.text, fontColor, renderer, &p1ReadyText.texture, 800 * 0.25, 500, &p1ReadyText.rect);
 
+    //-------------------------------------------------------------------------------------------//
+    
     TextObject p2ReadyText = {NULL, "Press 'UP'", {0}};
 
     InitializeText(fontSmall, p2ReadyText.text, fontColor, renderer, &p2ReadyText.texture, 800 * 0.75, 500, &p2ReadyText.rect);
 
+    //-------------------------------------------------------------------------------------------//
+    
     TextObject p1ReadyPromptText = {NULL, "Ready?", {0}};
 
     InitializeText(fontSmall, p1ReadyPromptText.text, fontColor, renderer, &p1ReadyPromptText.texture, 800 * 0.25, 450, &p1ReadyPromptText.rect);
+
+    //-------------------------------------------------------------------------------------------//
 
     TextObject p2ReadyPromptText = {NULL, "Ready?", {0}};
 
     InitializeText(fontSmall, p2ReadyPromptText.text, fontColor, renderer, &p2ReadyPromptText.texture, 800 * 0.75, 450, &p2ReadyPromptText.rect);
 
+    //-------------------------------------------------------------------------------------------//
+
+    TextObject victoryText01 = {NULL, "P1 wins!!!", {0}};
+
+    InitializeText(fontSmall, victoryText01.text, fontColor, renderer, &victoryText01.texture, 
+                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5f, &victoryText01.rect);
+
+    //-------------------------------------------------------------------------------------------//
+    
+    TextObject victoryText02 = {NULL, "P2 wins!!!", {0}};
+
+    InitializeText(fontSmall, victoryText02.text, fontColor, renderer, &victoryText02.texture, 
+                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5f, &victoryText02.rect);
+
+    //-------------------------------------------------------------------------------------------//
+    
     SDL_Texture *scoreP1FontTexture = NULL;
     SDL_Rect scoreP1FontRect = {0};
     int scoreP1 = 0;
@@ -204,12 +230,16 @@ int main(int argc, char **argv)
 
     InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
 
+    //-------------------------------------------------------------------------------------------//
+
     SDL_Texture *scoreP2FontTexture = NULL;
     SDL_Rect scoreP2FontRect = {0};
     int scoreP2= 0;
     char scoreP2Text[2] = "0";
 
     InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 800-200, 50, &scoreP2FontRect);
+
+    //-------------------------------------------------------------------------------------------//
 
     SDL_Texture *fpsFontTexture = NULL;
     SDL_Rect fpsFontRect = {0};
@@ -302,7 +332,7 @@ int main(int argc, char **argv)
         //Handle Ready State...
         HandleReadyState(&gameState, playerState);
 
-        if(gameState != GET_READY)
+        if(gameState != GET_READY && gameState != RESULT)
         { 
             //Player 01 Paddle movement...
             if(paddle01State == PADDLE_STATE_UP) 
@@ -345,7 +375,7 @@ int main(int argc, char **argv)
                     printf("Unable to reset data...\n");
                 }
 
-                IncreaseScore(&scoreP2, scoreP2Text);
+                IncreaseScore(&scoreP2, scoreP2Text, &gameState);
 
                 InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 800-200, 50, &scoreP2FontRect);
             } 
@@ -357,7 +387,7 @@ int main(int argc, char **argv)
                 {
                     printf("Unable to reset data...\n");
                 }
-                IncreaseScore(&scoreP1, scoreP1Text);
+                IncreaseScore(&scoreP1, scoreP1Text, &gameState);
 
                 InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
             }
@@ -416,13 +446,28 @@ int main(int argc, char **argv)
             SDL_RenderCopy(renderer, p2ReadyPromptText.texture, NULL, &p2ReadyPromptText.rect);
             SDL_RenderCopy(renderer, p2ReadyText.texture, NULL, &p2ReadyText.rect);
         }
+        else if(gameState == RESULT)
+        {
+            if(scoreP1 > scoreP2)
+            {
+                SDL_RenderCopy(renderer, victoryText01.texture, NULL, &victoryText01.rect);
+            }
+            else 
+            {
+                SDL_RenderCopy(renderer, victoryText02.texture, NULL, &victoryText02.rect);
+            }
+        }
 
         SDL_RenderFillRect(renderer, &paddle01);
         SDL_RenderFillRect(renderer, &paddle02);
 
-        SDL_SetRenderDrawColor(renderer, 255,0,0,1);
-
-        SDL_RenderFillRect(renderer, &ball);
+        
+        //Don't render the ball in Result screen...
+        if(gameState != RESULT)
+        {
+            SDL_SetRenderDrawColor(renderer, 255,0,0,1);
+            SDL_RenderFillRect(renderer, &ball);
+        }
 
         SDL_RenderPresent(renderer);
 
@@ -456,16 +501,18 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void IncreaseScore(int *score, char * scoreText)
+void IncreaseScore(int *score, char * scoreText, char *gameState)
 {
     *score += 1;
 
-    if(*score > 5)
-    {
-        printf("Somebody wins!\n");
-        return;
-    }
+    //48 = 0 in ASCII table. So it starts from 0...
     scoreText[0] = 48 + (*score);
+
+    //Win condition...
+    if(*score >= GAME_POINT) 
+    { 
+        *gameState = RESULT;
+    }
 }
 
 
@@ -514,15 +561,16 @@ void HandleReadyState(char * gameState, char playerState)
 
 void HandleGameStateMenu(char * gameState)
 {
-    //Set game state to READY...
+    if(*gameState == RESULT) return;
+
     (*gameState) =  GET_READY; 
 }
 
 int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost,char * playerState
         ,SDL_Rect *paddle01, SDL_Rect *paddle02)
 {
-    ball->x = 800 * 0.5 - ball->w * 0.5;
-    ball->y = 600 * 0.5 - ball->h * 0.5;
+    ball->x = SCREEN_RES_WIDTH * 0.5 - ball->w * 0.5;
+    ball->y = SCREEN_RES_HEIGHT * 0.5 - ball->h * 0.5;
 
     currentBallSpeed->y = 0;
     currentBallSpeed->x = 350;
