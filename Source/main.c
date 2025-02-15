@@ -81,6 +81,8 @@ uint8_t CheckCollision(SDL_Rect a, SDL_Rect b)
     return 0;
 }
 
+void ResetScore(int * scoreP1,char * scoreP1Text ,int * scoreP2, char * scoreP2Text);
+
 int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost, char *playerState, 
         SDL_Rect *paddle01, SDL_Rect *paddle02);
 
@@ -223,6 +225,13 @@ int main(int argc, char **argv)
 
     //-------------------------------------------------------------------------------------------//
     
+    TextObject restartText = {NULL, "Press 'R' to restart!", {0}};
+
+    InitializeText(fontSmall, restartText.text, fontColor, renderer, &restartText.texture, 
+                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5f + victoryText01.rect.h, &restartText.rect);
+
+    //-------------------------------------------------------------------------------------------//
+    
     SDL_Texture *scoreP1FontTexture = NULL;
     SDL_Rect scoreP1FontRect = {0};
     int scoreP1 = 0;
@@ -281,8 +290,15 @@ int main(int argc, char **argv)
                 SDL_Quit();
             }
 
+            //--------------------------------------------------------------------------------
+            //PADDLE CONTROLS...
+            //--------------------------------------------------------------------------------
             if(event.type == SDL_KEYDOWN)
             {
+
+            //--------------------------------------------------------------------------------
+            //PADDLE CONTROLS...
+            //--------------------------------------------------------------------------------
                 if(event.key.keysym.sym == SDLK_w)
                 {
                     if(gameState == GET_READY)
@@ -307,6 +323,24 @@ int main(int argc, char **argv)
                 if(event.key.keysym.sym == SDLK_DOWN)
                 {
                     paddle02State = PADDLE_STATE_DOWN;
+                }
+
+                //--------------------------------------------------------------------------------
+                //RESTART GAME...
+                //--------------------------------------------------------------------------------
+                if(event.key.keysym.sym == SDLK_r)
+                {
+                    if(gameState == RESULT)
+                    {
+                        ResetScore(&scoreP1, scoreP1Text, &scoreP2, scoreP2Text);
+                        gameState = GET_READY; 
+
+                        InitializeText(fontMedium, scoreP1Text, fontColor, renderer, 
+                                &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
+
+                        InitializeText(fontMedium, scoreP2Text, fontColor, renderer, 
+                                &scoreP2FontTexture, 800-200, 50, &scoreP2FontRect);
+                    }
                 }
             } 
             else if(event.type ==SDL_KEYUP)
@@ -456,6 +490,8 @@ int main(int argc, char **argv)
             {
                 SDL_RenderCopy(renderer, victoryText02.texture, NULL, &victoryText02.rect);
             }
+
+            SDL_RenderCopy(renderer, restartText.texture, NULL, &restartText.rect);
         }
 
         SDL_RenderFillRect(renderer, &paddle01);
@@ -528,7 +564,12 @@ int InitializeText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer 
         return FALSE;
     }
 
+    if(*fontTexture != NULL)
+    {
+        SDL_DestroyTexture(*fontTexture);
+    }
     *fontTexture = SDL_CreateTextureFromSurface(renderer, fontSurface);
+
     if(fontTexture == NULL)
     {
         printf("Font texture initialization error!\n");
@@ -561,9 +602,22 @@ void HandleReadyState(char * gameState, char playerState)
 
 void HandleGameStateMenu(char * gameState)
 {
-    if(*gameState == RESULT) return;
+    if(*gameState == RESULT) 
+    {
+        return;
+    }
 
     (*gameState) =  GET_READY; 
+}
+
+void ResetScore(int * scoreP1,char * scoreP1Text ,int * scoreP2, char * scoreP2Text)
+{
+    *scoreP1 = 0;
+    scoreP1Text[0] = '0';
+
+    *scoreP2 = 0;
+    scoreP2Text[0] = '0';
+
 }
 
 int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost,char * playerState
