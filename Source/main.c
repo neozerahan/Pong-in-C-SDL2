@@ -25,6 +25,11 @@
 #define GET_READY   0b10 
 #define IN_GAME    0b100 
 #define RESULT    0b1000 
+#define PAUSE    0b10000 
+
+//GAME SCENE...
+#define INTRO 1
+#define GAME  2   
 
 //PLAYER STATES...
 #define PLAYERS_NOT_READY   0b0
@@ -112,10 +117,14 @@ int main(int argc, char **argv)
         ballSpeed.x, 
         0};
 
-    char gameState = MENU; //initialize to MENU game state...
-     //initialize to MENU game state...
+    char gameState = MENU;
 
     char playerState = 0; 
+
+    char sceneID = INTRO;
+
+    float sceneIntroTime = 1.0f;
+    float currentSceneIntroTime = 0.0f;
 
     float paddleSpeed = 350;
     float ballBoost = 1;
@@ -186,7 +195,7 @@ int main(int argc, char **argv)
     SDL_Color fontColor = {WHITE};
 
     //-------------------------------------------------------------------------------------------//
-    //
+    
     TextObject p1ReadyText = {NULL, "Press 'W'", {0}};
 
     InitializeText(fontSmall, p1ReadyText.text, fontColor, renderer, &p1ReadyText.texture, 800 * 0.25, 500, &p1ReadyText.rect);
@@ -228,7 +237,27 @@ int main(int argc, char **argv)
     TextObject restartText = {NULL, "Press 'R' to restart!", {0}};
 
     InitializeText(fontSmall, restartText.text, fontColor, renderer, &restartText.texture, 
-                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5f + victoryText01.rect.h, &restartText.rect);
+                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5f + victoryText01.rect.h + 5, &restartText.rect);
+
+    //-------------------------------------------------------------------------------------------//
+    
+    TextObject developerText = {NULL, "OHS ENGINE", {0}};
+
+    InitializeText(fontSmall, developerText.text, fontColor, renderer, &developerText.texture, 
+                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5f, &developerText.rect);
+
+    //-------------------------------------------------------------------------------------------//
+    
+    TextObject titleText = {NULL, "PONG", {0}};
+
+    InitializeText(fontMedium, titleText.text, fontColor, renderer, &titleText.texture, 
+                   SCREEN_RES_WIDTH * 0.5f,50, &titleText.rect);
+
+    //-------------------------------------------------------------------------------------------//
+    TextObject pauseText = {NULL, "PAUSED!", {0}};
+
+    InitializeText(fontMedium, pauseText.text, fontColor, renderer, &pauseText.texture, 
+                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5, &pauseText.rect);
 
     //-------------------------------------------------------------------------------------------//
     
@@ -271,8 +300,8 @@ int main(int argc, char **argv)
 
     ball.w = 16;
     ball.h = 16;
-    ball.x = 800 * 0.5;
-    ball.y = (600 * 0.5) - (128 * 0.5);
+    ball.x = SCREEN_RES_WIDTH * 0.5;
+    ball.y = (SCREEN_RES_HEIGHT * 0.5) - (PADDLE_HEIGHT * 0.5);
    
     startFrameTime = SDL_GetTicks();
     while(isRunning)
@@ -290,12 +319,9 @@ int main(int argc, char **argv)
                 SDL_Quit();
             }
 
-            //--------------------------------------------------------------------------------
-            //PADDLE CONTROLS...
-            //--------------------------------------------------------------------------------
+            
             if(event.type == SDL_KEYDOWN)
             {
-
             //--------------------------------------------------------------------------------
             //PADDLE CONTROLS...
             //--------------------------------------------------------------------------------
@@ -339,10 +365,23 @@ int main(int argc, char **argv)
                                 &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
 
                         InitializeText(fontMedium, scoreP2Text, fontColor, renderer, 
-                                &scoreP2FontTexture, 800-200, 50, &scoreP2FontRect);
+                                &scoreP2FontTexture, SCREEN_RES_WIDTH - 200, 50, &scoreP2FontRect);
                     }
                 }
-            } 
+                    if(event.key.keysym.sym == SDLK_p)
+                    {
+                        if(gameState == IN_GAME)
+                        {
+                            gameState = PAUSE;
+                            printf("Game Paused!!!\n");
+                        }
+                        else if(gameState == PAUSE)
+                        {
+                            gameState = IN_GAME;
+                            printf("Game Unpaused!!!\n");
+                        }
+                    } 
+            }
             else if(event.type ==SDL_KEYUP)
             {
                 if(event.key.keysym.sym == SDLK_w || event.key.keysym.sym == SDLK_s)
@@ -359,14 +398,25 @@ int main(int argc, char **argv)
         /*----------------------------------------------------------------------------------------
         GAME-LOGIC     
         ----------------------------------------------------------------------------------------*/
+        if(sceneID == INTRO){
+            currentSceneIntroTime += deltaTime;
+            if(currentSceneIntroTime > sceneIntroTime){
+                sceneID = GAME;
+            }
+        }
 
         //Handle Menu State...
-        HandleGameStateMenu(&gameState); 
+        if(gameState != PAUSE)
+        {
+            HandleGameStateMenu(&gameState); 
+        }
 
         //Handle Ready State...
-        HandleReadyState(&gameState, playerState);
-
-        if(gameState != GET_READY && gameState != RESULT)
+        if(gameState != PAUSE)
+        {
+            HandleReadyState(&gameState, playerState);
+        }
+        if(gameState != GET_READY && gameState != RESULT && gameState != PAUSE)
         { 
             //Player 01 Paddle movement...
             if(paddle01State == PADDLE_STATE_UP) 
@@ -376,7 +426,7 @@ int main(int argc, char **argv)
             }
             else if (paddle01State == PADDLE_STATE_DOWN)
             {
-                if(paddle01.y < 600 - paddle01.h)
+                if(paddle01.y < SCREEN_RES_HEIGHT- paddle01.h)
                     paddle01.y += paddleSpeed * deltaTime; 
             }
 
@@ -387,7 +437,7 @@ int main(int argc, char **argv)
             }
             else if (paddle02State == PADDLE_STATE_DOWN)
             {
-                if(paddle02.y < 600 - paddle02.h)
+                if(paddle02.y < SCREEN_RES_HEIGHT - paddle02.h)
                     paddle02.y += paddleSpeed * deltaTime; 
             }
 
@@ -395,7 +445,7 @@ int main(int argc, char **argv)
             {
                 currentBallSpeed.y = ballSpeed.y;
             } 
-            else if(ball.y + ball.h > 600)
+            else if(ball.y + ball.h > SCREEN_RES_HEIGHT)
             {
                 currentBallSpeed.y = -ballSpeed.y;
             }
@@ -411,10 +461,11 @@ int main(int argc, char **argv)
 
                 IncreaseScore(&scoreP2, scoreP2Text, &gameState);
 
-                InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 800-200, 50, &scoreP2FontRect);
+                InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 
+                        SCREEN_RES_WIDTH - 200, 50, &scoreP2FontRect);
             } 
 
-            if ( ball.x + ball.w > 800)
+            if ( ball.x + ball.w > SCREEN_RES_WIDTH)
             {
                 if(ResetData(&ball, &currentBallSpeed, &ballBoost, &playerState, &paddle01, &paddle02) 
                         == FALSE)
@@ -423,7 +474,8 @@ int main(int argc, char **argv)
                 }
                 IncreaseScore(&scoreP1, scoreP1Text, &gameState);
 
-                InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
+                InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 
+                        200, 50, &scoreP1FontRect);
             }
 
             if(CheckCollision(ball,paddle02)) 
@@ -463,46 +515,73 @@ int main(int argc, char **argv)
         /*-----------------------------------------------------------------------------------------
         //RENDER LOOP...
         ----------------------------------------------------------------------------------------- */
-         
-        SDL_SetRenderDrawColor(renderer, GREY);
-        SDL_RenderClear(renderer);
-    
-        SDL_SetRenderDrawColor(renderer, WHITE);
-        
-        SDL_RenderCopy(renderer, scoreP1FontTexture, NULL, &scoreP1FontRect);
-        SDL_RenderCopy(renderer, scoreP2FontTexture, NULL, &scoreP2FontRect);
 
-        if(gameState == GET_READY)
+        //Intro Scene...
+        if(sceneID == INTRO)
         {
-            SDL_RenderCopy(renderer, p1ReadyPromptText.texture, NULL, &p1ReadyPromptText.rect);
-            SDL_RenderCopy(renderer, p1ReadyText.texture, NULL, &p1ReadyText.rect);
+            SDL_SetRenderDrawColor(renderer, BLACK);
+            SDL_RenderClear(renderer);
 
-            SDL_RenderCopy(renderer, p2ReadyPromptText.texture, NULL, &p2ReadyPromptText.rect);
-            SDL_RenderCopy(renderer, p2ReadyText.texture, NULL, &p2ReadyText.rect);
-        }
-        else if(gameState == RESULT)
-        {
-            if(scoreP1 > scoreP2)
-            {
-                SDL_RenderCopy(renderer, victoryText01.texture, NULL, &victoryText01.rect);
-            }
-            else 
-            {
-                SDL_RenderCopy(renderer, victoryText02.texture, NULL, &victoryText02.rect);
-            }
-
-            SDL_RenderCopy(renderer, restartText.texture, NULL, &restartText.rect);
+            SDL_RenderCopy(renderer, developerText.texture, NULL, &developerText.rect);
         }
 
-        SDL_RenderFillRect(renderer, &paddle01);
-        SDL_RenderFillRect(renderer, &paddle02);
-
-        
-        //Don't render the ball in Result screen...
-        if(gameState != RESULT)
+        if(sceneID == GAME) 
         {
-            SDL_SetRenderDrawColor(renderer, 255,0,0,1);
-            SDL_RenderFillRect(renderer, &ball);
+            SDL_SetRenderDrawColor(renderer, GREY);
+            SDL_RenderClear(renderer);
+
+            SDL_SetRenderDrawColor(renderer, WHITE);
+
+            //RENDER PLAYER SCORES...
+            if(gameState == IN_GAME || gameState == RESULT || gameState == PAUSE)
+            {
+                SDL_RenderCopy(renderer, scoreP1FontTexture, NULL, &scoreP1FontRect);
+                SDL_RenderCopy(renderer, scoreP2FontTexture, NULL, &scoreP2FontRect);
+            }
+
+            //RENDER PAUSED TEXT...
+            if(gameState == PAUSE)
+            {
+                SDL_RenderCopy(renderer, pauseText.texture, NULL, &pauseText.rect);
+            }
+            
+            //RENDER READY TEXT AND OBJECTS...
+            if(gameState == GET_READY)
+            {
+                SDL_RenderCopy(renderer, titleText.texture,NULL, &titleText.rect);
+
+                SDL_RenderCopy(renderer, p1ReadyPromptText.texture, NULL, &p1ReadyPromptText.rect);
+                SDL_RenderCopy(renderer, p1ReadyText.texture, NULL, &p1ReadyText.rect);
+
+                SDL_RenderCopy(renderer, p2ReadyPromptText.texture, NULL, &p2ReadyPromptText.rect);
+                SDL_RenderCopy(renderer, p2ReadyText.texture, NULL, &p2ReadyText.rect);
+            }
+
+            //RENDER RESULT SCREEN...
+            else if(gameState == RESULT)
+            {
+                if(scoreP1 > scoreP2)
+                {
+                    SDL_RenderCopy(renderer, victoryText01.texture, NULL, &victoryText01.rect);
+                }
+                else 
+                {
+                    SDL_RenderCopy(renderer, victoryText02.texture, NULL, &victoryText02.rect);
+                }
+
+                SDL_RenderCopy(renderer, restartText.texture, NULL, &restartText.rect);
+            }
+            
+            //RENDER PADDLES...
+            SDL_RenderFillRect(renderer, &paddle01);
+            SDL_RenderFillRect(renderer, &paddle02);
+
+            //Don't render the ball in Result screen...
+            if(gameState != RESULT)
+            {
+                SDL_SetRenderDrawColor(renderer, 255,0,0,1);
+                SDL_RenderFillRect(renderer, &ball);
+            }
         }
 
         SDL_RenderPresent(renderer);
@@ -518,7 +597,7 @@ int main(int argc, char **argv)
         if(frameCounter >= 100)
         {
             printf("Raw FPS: %.2f\n\n", 100/(fpsCollector * 0.001f));
-           
+
             frameCounter = 0;
             fpsCollector = 0;
         }
@@ -603,9 +682,7 @@ void HandleReadyState(char * gameState, char playerState)
 void HandleGameStateMenu(char * gameState)
 {
     if(*gameState == RESULT) 
-    {
         return;
-    }
 
     (*gameState) =  GET_READY; 
 }
