@@ -5,6 +5,7 @@
 #define SDL_MAIN_HANDLED
 #include "..\Include\SDL2\SDL.h"
 #include "..\Include\SDL2\SDL_ttf.h"
+#include "..\Include\SDL2\SDL_mixer.h"
 
 //COLORS
 #define WHITE   255,255,255,255
@@ -18,7 +19,7 @@
 #define TRUE 1
 #define FALSE 0
 
-#define GAME_POINT 1
+#define GAME_POINT 3
 
 //GAME STATES...
 #define MENU         0b1 
@@ -30,6 +31,7 @@
 //GAME SCENE...
 #define INTRO 1
 #define GAME  2   
+#define TITLE 3
 
 //PLAYER STATES...
 #define PLAYERS_NOT_READY   0b0
@@ -67,6 +69,11 @@ typedef struct TextObject{
     SDL_Rect rect;
 }TextObject;
 
+typedef struct sfx{
+    Mix_Chunk *paddleHit;
+    Mix_Chunk *gainScore;
+}sfx;
+
 uint8_t CheckCollision(SDL_Rect a, SDL_Rect b)
 {
     int aP1 = a.x;
@@ -98,7 +105,7 @@ int InitializeText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer 
 
 void HandleGameStateMenu(char * gameState);
 
-void HandleReadyState(char * gameState, char playerState);
+void HandleReadyState(char * gameState, char playerState, char * sceneID);
 
 int CreateFont(TTF_Font **font, unsigned int fontSize);
 
@@ -147,9 +154,51 @@ int main(int argc, char **argv)
     printf("Pong Initialized!\n");
 
     if(SDL_Init(SDL_INIT_VIDEO) < 0){
-        printf("Unable to initialize SDL!\n");
+        printf("Unable to initialize SDL Video!\n");
         return 1;
     }
+
+    //-------------------------------------------------------------------------------------------//
+    //                             SDL_AUDIO INITIALIZATION 
+    //-------------------------------------------------------------------------------------------//
+
+    if(SDL_Init(SDL_INIT_AUDIO) < 0){
+        printf("Unable to initialize SDL Audio!\n");
+        return 1;
+    }
+
+    if(Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0)
+    {
+        printf("Unable to open audio!\n");
+        return 1;
+    }
+    Mix_Music * bgMusic = NULL;
+
+    bgMusic = Mix_LoadMUS("../Resources/PongBGMusic.mp3");
+
+    if(bgMusic == NULL)
+    {
+        printf("Unable to load bg music!\n");
+        return 1;
+    }
+
+    sfx SFXs = {NULL};
+    
+    SFXs.paddleHit = Mix_LoadWAV("../Resources/SFXPaddleHit.wav");
+
+    if(SFXs.paddleHit == NULL){
+        printf("unable to load SFXpaddleHit.wav!\n");
+        return 1;
+    }
+
+    SFXs.gainScore = Mix_LoadWAV("../Resources/SFXScoreGain.wav");
+
+    if(SFXs.gainScore == NULL){
+        printf("unable to load SFXScoreGain.wav!\n");
+        return 1;
+    }
+
+    //-------------------------------------------------------------------------------------------//
 
     //Creates window...
     window = SDL_CreateWindow("PONG", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, 0);
@@ -360,6 +409,7 @@ int main(int argc, char **argv)
                     {
                         ResetScore(&scoreP1, scoreP1Text, &scoreP2, scoreP2Text);
                         gameState = GET_READY; 
+                        sceneID = TITLE;
 
                         InitializeText(fontMedium, scoreP1Text, fontColor, renderer, 
                                 &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
@@ -401,10 +451,9 @@ int main(int argc, char **argv)
         if(sceneID == INTRO){
             currentSceneIntroTime += deltaTime;
             if(currentSceneIntroTime > sceneIntroTime){
-                sceneID = GAME;
+                sceneID = TITLE;
             }
         }
-
         //Handle Menu State...
         if(gameState != PAUSE)
         {
@@ -414,8 +463,16 @@ int main(int argc, char **argv)
         //Handle Ready State...
         if(gameState != PAUSE)
         {
-            HandleReadyState(&gameState, playerState);
+            HandleReadyState(&gameState, playerState, &sceneID);
         }
+        
+        if(sceneID == TITLE){
+            if(Mix_PlayingMusic() == 0){
+                printf("Playing Music...\n");
+                Mix_PlayMusic(bgMusic, -1);
+            }
+        }
+
         if(gameState != GET_READY && gameState != RESULT && gameState != PAUSE)
         { 
             //Player 01 Paddle movement...
@@ -441,19 +498,25 @@ int main(int argc, char **argv)
                     paddle02.y += paddleSpeed * deltaTime; 
             }
 
+            //Upper and Lower screen bound collision check...
             if(ball.y < 0) 
             {
                 currentBallSpeed.y = ballSpeed.y;
+
+                Mix_PlayChannel(-1, SFXs.paddleHit, 0);
             } 
             else if(ball.y + ball.h > SCREEN_RES_HEIGHT)
             {
                 currentBallSpeed.y = -ballSpeed.y;
+
+                Mix_PlayChannel(-1, SFXs.paddleHit, 0);
             }
 
             //Increase score...
             if(ball.x < 0)
             {
-                if(ResetData(&ball, &currentBallSpeed, &ballBoost, &playerState, &paddle01, &paddle02) 
+                if(ResetData(&ball, &currentBallSpeed, &ballBoost, &playerState, &paddle01, 
+                            &paddle02) 
                         == FALSE)
                 {
                     printf("Unable to reset data...\n");
@@ -463,11 +526,14 @@ int main(int argc, char **argv)
 
                 InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 
                         SCREEN_RES_WIDTH - 200, 50, &scoreP2FontRect);
+
+                Mix_PlayChannel(-1,SFXs.gainScore, 0);
             } 
 
             if ( ball.x + ball.w > SCREEN_RES_WIDTH)
             {
-                if(ResetData(&ball, &currentBallSpeed, &ballBoost, &playerState, &paddle01, &paddle02) 
+                if(ResetData(&ball, &currentBallSpeed, &ballBoost, &playerState, &paddle01, 
+                            &paddle02 ) 
                         == FALSE)
                 {
                     printf("Unable to reset data...\n");
@@ -476,6 +542,8 @@ int main(int argc, char **argv)
 
                 InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 
                         200, 50, &scoreP1FontRect);
+
+                Mix_PlayChannel(-1,SFXs.gainScore, 0);
             }
 
             if(CheckCollision(ball,paddle02)) 
@@ -491,6 +559,9 @@ int main(int argc, char **argv)
                 {
                     currentBallSpeed.y = ballSpeed.y + ballBoost;
                 }
+
+                //Play SFX
+                Mix_PlayChannel(-1, SFXs.paddleHit, 0);
             }
 
             if(CheckCollision(ball, paddle01) == 1)
@@ -506,6 +577,8 @@ int main(int argc, char **argv)
                 {
                     currentBallSpeed.y = ballSpeed.y + ballBoost;
                 }
+
+                Mix_PlayChannel(-1, SFXs.paddleHit, 0);
             }
 
             ball.x += currentBallSpeed.x * deltaTime;
@@ -525,7 +598,7 @@ int main(int argc, char **argv)
             SDL_RenderCopy(renderer, developerText.texture, NULL, &developerText.rect);
         }
 
-        if(sceneID == GAME) 
+        if(sceneID == GAME || sceneID == TITLE) 
         {
             SDL_SetRenderDrawColor(renderer, GREY);
             SDL_RenderClear(renderer);
@@ -533,7 +606,7 @@ int main(int argc, char **argv)
             SDL_SetRenderDrawColor(renderer, WHITE);
 
             //RENDER PLAYER SCORES...
-            if(gameState == IN_GAME || gameState == RESULT || gameState == PAUSE)
+            if(sceneID == GAME)
             {
                 SDL_RenderCopy(renderer, scoreP1FontTexture, NULL, &scoreP1FontRect);
                 SDL_RenderCopy(renderer, scoreP2FontTexture, NULL, &scoreP2FontRect);
@@ -548,7 +621,8 @@ int main(int argc, char **argv)
             //RENDER READY TEXT AND OBJECTS...
             if(gameState == GET_READY)
             {
-                SDL_RenderCopy(renderer, titleText.texture,NULL, &titleText.rect);
+                if(sceneID == TITLE)
+                    SDL_RenderCopy(renderer, titleText.texture,NULL, &titleText.rect);
 
                 SDL_RenderCopy(renderer, p1ReadyPromptText.texture, NULL, &p1ReadyPromptText.rect);
                 SDL_RenderCopy(renderer, p1ReadyText.texture, NULL, &p1ReadyText.rect);
@@ -667,7 +741,7 @@ int InitializeText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer 
     return TRUE;
 }
 
-void HandleReadyState(char * gameState, char playerState)
+void HandleReadyState(char * gameState, char playerState, char * sceneID)
 {
     if((*gameState) == GET_READY)
     {
@@ -675,6 +749,7 @@ void HandleReadyState(char * gameState, char playerState)
         if(playerState & PLAYER_1_READY && playerState & PLAYER_2_READY)
         {
             *gameState = IN_GAME;
+            *sceneID = GAME;
         }
     }
 }
@@ -694,7 +769,6 @@ void ResetScore(int * scoreP1,char * scoreP1Text ,int * scoreP2, char * scoreP2T
 
     *scoreP2 = 0;
     scoreP2Text[0] = '0';
-
 }
 
 int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost,char * playerState
