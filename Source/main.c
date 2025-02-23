@@ -12,6 +12,7 @@
 #define BLACK   0,0,0,255
 #define GREY    80,80,80,255
 
+//PADDLE STATES
 #define PADDLE_STATE_NONE 0
 #define PADDLE_STATE_UP 1
 #define PADDLE_STATE_DOWN 2
@@ -21,37 +22,41 @@
 
 #define GAME_POINT 3
 
-//GAME STATES...
+//GAME STATES
 #define MENU         0b1 
 #define GET_READY   0b10 
 #define IN_GAME    0b100 
 #define RESULT    0b1000 
 #define PAUSE    0b10000 
 
-//GAME SCENE...
+//GAME SCENE
 #define INTRO 1
 #define GAME  2   
 #define TITLE 3
 
-//PLAYER STATES...
+//PLAYER STATES
 #define PLAYERS_NOT_READY   0b0
 #define PLAYER_1_READY      0b1
 #define PLAYER_2_READY      0b10
 
-//SCREEN RESOLUTION...
+//SCREEN RESOLUTION
 #define SCREEN_RES_HEIGHT       600
 #define SCREEN_RES_WIDTH        800
 
-//PADDLE DIMENSIONS...
+//PADDLE DIMENSIONS
 #define PADDLE_WIDTH            16 
 #define PADDLE_HEIGHT           128 
 
-//PADDLE POSITION...
+//PADDLE POSITION
 #define PADDLE01_DEFAULT_X_POS  100 - (PADDLE_WIDTH * 0.5) 
 #define PADDLE01_DEFAULT_Y_POS  (SCREEN_RES_HEIGHT * 0.5) - (PADDLE_HEIGHT * 0.5)
 
 #define PADDLE02_DEFAULT_X_POS  SCREEN_RES_WIDTH - 100 - (PADDLE_WIDTH * 0.5)
 #define PADDLE02_DEFAULT_Y_POS  (SCREEN_RES_HEIGHT * 0.5) - (PADDLE_HEIGHT * 0.5)
+
+//-----------------------------------------------------------------------------------------------//
+//                                          OBJECTS
+//-----------------------------------------------------------------------------------------------//
 
 typedef struct Speed{
     float x;
@@ -93,6 +98,8 @@ uint8_t CheckCollision(SDL_Rect a, SDL_Rect b)
     return 0;
 }
 
+//-----------------------------------------------------------------------------------------------//
+
 void ResetScore(int * scoreP1,char * scoreP1Text ,int * scoreP2, char * scoreP2Text);
 
 int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost, char *playerState, 
@@ -108,6 +115,8 @@ void HandleGameStateMenu(char * gameState);
 void HandleReadyState(char * gameState, char playerState, char * sceneID);
 
 int CreateFont(TTF_Font **font, unsigned int fontSize);
+
+//-----------------------------------------------------------------------------------------------//
 
 int main(int argc, char **argv)
 {
@@ -151,8 +160,6 @@ int main(int argc, char **argv)
     uint32_t frameTime = 0;
     float deltaTime = 0;
 
-    printf("Pong Initialized!\n");
-
     if(SDL_Init(SDL_INIT_VIDEO) < 0){
         printf("Unable to initialize SDL Video!\n");
         return 1;
@@ -183,7 +190,7 @@ int main(int argc, char **argv)
     }
 
     sfx SFXs = {NULL};
-    
+
     SFXs.paddleHit = Mix_LoadWAV("../Resources/SFXPaddleHit.wav");
 
     if(SFXs.paddleHit == NULL){
@@ -201,7 +208,8 @@ int main(int argc, char **argv)
     //-------------------------------------------------------------------------------------------//
 
     //Creates window...
-    window = SDL_CreateWindow("PONG", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, 0);
+    window = SDL_CreateWindow("PONG", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
+            SCREEN_RES_WIDTH, SCREEN_RES_HEIGHT, 0);
 
     if(window == NULL)
     {
@@ -218,9 +226,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
-     //------------------------------------------------------------------
-     //                             FONT
-     //------------------------------------------------------------------
+    //-------------------------------------------------------------------------------------------//
+    //                                          FONT
+    //-------------------------------------------------------------------------------------------//
 
      if(TTF_Init() < 0)
     {
@@ -243,29 +251,36 @@ int main(int argc, char **argv)
 
     SDL_Color fontColor = {WHITE};
 
+
     //-------------------------------------------------------------------------------------------//
-    
+    //                                          TEXT 
+    //-------------------------------------------------------------------------------------------//
+
     TextObject p1ReadyText = {NULL, "Press 'W'", {0}};
 
-    InitializeText(fontSmall, p1ReadyText.text, fontColor, renderer, &p1ReadyText.texture, 800 * 0.25, 500, &p1ReadyText.rect);
+    InitializeText(fontSmall, p1ReadyText.text, fontColor, renderer, &p1ReadyText.texture, 
+            PADDLE01_DEFAULT_X_POS, PADDLE01_DEFAULT_Y_POS + 150, &p1ReadyText.rect);
 
     //-------------------------------------------------------------------------------------------//
     
     TextObject p2ReadyText = {NULL, "Press 'UP'", {0}};
 
-    InitializeText(fontSmall, p2ReadyText.text, fontColor, renderer, &p2ReadyText.texture, 800 * 0.75, 500, &p2ReadyText.rect);
+    InitializeText(fontSmall, p2ReadyText.text, fontColor, renderer, &p2ReadyText.texture, 
+            PADDLE02_DEFAULT_X_POS, PADDLE02_DEFAULT_Y_POS + 150, &p2ReadyText.rect);
 
     //-------------------------------------------------------------------------------------------//
     
     TextObject p1ReadyPromptText = {NULL, "Ready?", {0}};
 
-    InitializeText(fontSmall, p1ReadyPromptText.text, fontColor, renderer, &p1ReadyPromptText.texture, 800 * 0.25, 450, &p1ReadyPromptText.rect);
+    InitializeText(fontSmall, p1ReadyPromptText.text, fontColor, renderer, &p1ReadyPromptText.texture, 
+            PADDLE01_DEFAULT_X_POS, p1ReadyText.rect.y + 40, &p1ReadyPromptText.rect);
 
     //-------------------------------------------------------------------------------------------//
 
     TextObject p2ReadyPromptText = {NULL, "Ready?", {0}};
 
-    InitializeText(fontSmall, p2ReadyPromptText.text, fontColor, renderer, &p2ReadyPromptText.texture, 800 * 0.75, 450, &p2ReadyPromptText.rect);
+    InitializeText(fontSmall, p2ReadyPromptText.text, fontColor, renderer, &p2ReadyPromptText.texture, 
+            PADDLE02_DEFAULT_X_POS, p2ReadyText.rect.y + 40, &p2ReadyPromptText.rect);
 
     //-------------------------------------------------------------------------------------------//
 
@@ -286,7 +301,15 @@ int main(int argc, char **argv)
     TextObject restartText = {NULL, "Press 'R' to restart!", {0}};
 
     InitializeText(fontSmall, restartText.text, fontColor, renderer, &restartText.texture, 
-                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5f + victoryText01.rect.h + 5, &restartText.rect);
+                   SCREEN_RES_WIDTH * 0.5f, SCREEN_RES_HEIGHT * 0.5f + victoryText01.rect.h + 5, 
+                   &restartText.rect);
+
+    //-------------------------------------------------------------------------------------------//
+    
+    TextObject quitText = {NULL, "Press 'Q' to quit!", {0}};
+
+    InitializeText(fontSmall, quitText.text, fontColor, renderer, &quitText.texture, 
+                   SCREEN_RES_WIDTH * 0.5f, restartText.rect.y + restartText.rect.h, &quitText.rect);
 
     //-------------------------------------------------------------------------------------------//
     
@@ -315,7 +338,8 @@ int main(int argc, char **argv)
     int scoreP1 = 0;
     char scoreP1Text[2] = "0";
 
-    InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 200, 50, &scoreP1FontRect);
+    InitializeText(fontMedium, scoreP1Text, fontColor, renderer, &scoreP1FontTexture, 200, 50, 
+            &scoreP1FontRect);
 
     //-------------------------------------------------------------------------------------------//
 
@@ -324,7 +348,8 @@ int main(int argc, char **argv)
     int scoreP2= 0;
     char scoreP2Text[2] = "0";
 
-    InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 800-200, 50, &scoreP2FontRect);
+    InitializeText(fontMedium, scoreP2Text, fontColor, renderer, &scoreP2FontTexture, 
+            SCREEN_RES_WIDTH-200, 50, &scoreP2FontRect);
 
     //-------------------------------------------------------------------------------------------//
 
@@ -374,6 +399,15 @@ int main(int argc, char **argv)
             //--------------------------------------------------------------------------------
             //PADDLE CONTROLS...
             //--------------------------------------------------------------------------------
+
+                if(event.key.keysym.sym == SDLK_q)
+                {
+                    if(gameState == RESULT)
+                    {
+                        isRunning = 0;
+                        SDL_Quit();
+                    }
+                }
                 if(event.key.keysym.sym == SDLK_w)
                 {
                     if(gameState == GET_READY)
@@ -622,7 +656,14 @@ int main(int argc, char **argv)
             if(gameState == GET_READY)
             {
                 if(sceneID == TITLE)
+                {
                     SDL_RenderCopy(renderer, titleText.texture,NULL, &titleText.rect);
+
+                    SDL_Rect  quitRect = quitText.rect;
+                    quitRect.y = SCREEN_RES_HEIGHT * 0.8; 
+
+                    SDL_RenderCopy(renderer, quitText.texture,NULL, &quitRect);
+                }
 
                 SDL_RenderCopy(renderer, p1ReadyPromptText.texture, NULL, &p1ReadyPromptText.rect);
                 SDL_RenderCopy(renderer, p1ReadyText.texture, NULL, &p1ReadyText.rect);
@@ -644,6 +685,7 @@ int main(int argc, char **argv)
                 }
 
                 SDL_RenderCopy(renderer, restartText.texture, NULL, &restartText.rect);
+                SDL_RenderCopy(renderer, quitText.texture, NULL, &quitText.rect);
             }
             
             //RENDER PADDLES...
