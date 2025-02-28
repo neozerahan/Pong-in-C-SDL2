@@ -1,9 +1,21 @@
-This is a personal project that I developed to further my knowledge on C language and Simple Direct Library 2 (SDL2). 
+PONG - C & SDL2
+
+This is a personal project that I developed to further my knowledge of the C language and the Simple DirectMedia Layer 2 (SDL2).
 ![](https://github.com/neozerahan/Pong-SDL2-/blob/main/Resources/Pong.gif)
 
-This project helped me dip my toes in topics such as frame rate, Music, SFX, real-time input handling and rendering.
+This project helped me explore various game development concepts, including:
 
-To build, use the build.bat file in the project's root directory.
-To play the game, run the rootDirectory/Bin/game.exe or run the RunGame.bat file.
+- Frame rate management
+- Music and sound effects (SFX)
+- Real-time input handling
+- Rendering
 
-All the code is in one file found in /Source/main.c
+How to Build & Run
+Build
+- Run the build.bat file located in the project's root directory.
+Play
+- Run the game executable: rootDirectory/Bin/game.exe
+- Alternatively, use the RunGame.bat file to start the game.
+
+Code Structure
+All the code is contained in a single file:
