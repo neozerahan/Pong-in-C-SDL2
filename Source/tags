@@ -45,12 +45,26 @@ PADDLE_STATE_UP	main.c	/^#define PADDLE_STATE_UP /;"	d	file:
 PADDLE_STATE_DOWN	main.c	/^#define PADDLE_STATE_DOWN /;"	d	file:
 TRUE	main.c	/^#define TRUE /;"	d	file:
 FALSE	main.c	/^#define FALSE /;"	d	file:
+GAME_POINT	main.c	/^#define GAME_POINT /;"	d	file:
 MENU	main.c	/^#define MENU /;"	d	file:
 GET_READY	main.c	/^#define GET_READY /;"	d	file:
 IN_GAME	main.c	/^#define IN_GAME /;"	d	file:
 RESULT	main.c	/^#define RESULT /;"	d	file:
+PAUSE	main.c	/^#define PAUSE /;"	d	file:
+INTRO	main.c	/^#define INTRO /;"	d	file:
+GAME	main.c	/^#define GAME /;"	d	file:
+TITLE	main.c	/^#define TITLE /;"	d	file:
+PLAYERS_NOT_READY	main.c	/^#define PLAYERS_NOT_READY /;"	d	file:
 PLAYER_1_READY	main.c	/^#define PLAYER_1_READY /;"	d	file:
 PLAYER_2_READY	main.c	/^#define PLAYER_2_READY /;"	d	file:
+SCREEN_RES_HEIGHT	main.c	/^#define SCREEN_RES_HEIGHT /;"	d	file:
+SCREEN_RES_WIDTH	main.c	/^#define SCREEN_RES_WIDTH /;"	d	file:
+PADDLE_WIDTH	main.c	/^#define PADDLE_WIDTH /;"	d	file:
+PADDLE_HEIGHT	main.c	/^#define PADDLE_HEIGHT /;"	d	file:
+PADDLE01_DEFAULT_X_POS	main.c	/^#define PADDLE01_DEFAULT_X_POS /;"	d	file:
+PADDLE01_DEFAULT_Y_POS	main.c	/^#define PADDLE01_DEFAULT_Y_POS /;"	d	file:
+PADDLE02_DEFAULT_X_POS	main.c	/^#define PADDLE02_DEFAULT_X_POS /;"	d	file:
+PADDLE02_DEFAULT_Y_POS	main.c	/^#define PADDLE02_DEFAULT_Y_POS /;"	d	file:
 Speed	main.c	/^typedef struct Speed{$/;"	s	file:
 x	main.c	/^    float x;$/;"	m	struct:Speed	typeref:typename:float	file:
 y	main.c	/^    float y;$/;"	m	struct:Speed	typeref:typename:float	file:
@@ -64,11 +78,16 @@ texture	main.c	/^    SDL_Texture * texture;$/;"	m	struct:TextObject	typeref:type
 text	main.c	/^    char * text;$/;"	m	struct:TextObject	typeref:typename:char *	file:
 rect	main.c	/^    SDL_Rect rect;$/;"	m	struct:TextObject	typeref:typename:SDL_Rect	file:
 TextObject	main.c	/^}TextObject;$/;"	t	typeref:struct:TextObject	file:
+sfx	main.c	/^typedef struct sfx{$/;"	s	file:
+paddleHit	main.c	/^    Mix_Chunk *paddleHit;$/;"	m	struct:sfx	typeref:typename:Mix_Chunk *	file:
+gainScore	main.c	/^    Mix_Chunk *gainScore;$/;"	m	struct:sfx	typeref:typename:Mix_Chunk *	file:
+sfx	main.c	/^}sfx;$/;"	t	typeref:struct:sfx	file:
 CheckCollision	main.c	/^uint8_t CheckCollision(SDL_Rect a, SDL_Rect b)$/;"	f	typeref:typename:uint8_t
 main	main.c	/^int main(int argc, char **argv)$/;"	f	typeref:typename:int
-IncreaseScore	main.c	/^void IncreaseScore(int *score, char * scoreText)$/;"	f	typeref:typename:void
+IncreaseScore	main.c	/^void IncreaseScore(int *score, char * scoreText, char *gameState)$/;"	f	typeref:typename:void
 InitializeText	main.c	/^int InitializeText(TTF_Font *font,char* text, SDL_Color textColor, SDL_Renderer *renderer, $/;"	f	typeref:typename:int
-HandleReadyState	main.c	/^void HandleReadyState(char * gameState, char playerState)$/;"	f	typeref:typename:void
+HandleReadyState	main.c	/^void HandleReadyState(char * gameState, char playerState, char * sceneID)$/;"	f	typeref:typename:void
 HandleGameStateMenu	main.c	/^void HandleGameStateMenu(char * gameState)$/;"	f	typeref:typename:void
-ResetData	main.c	/^int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost)$/;"	f	typeref:typename:int
+ResetScore	main.c	/^void ResetScore(int * scoreP1,char * scoreP1Text ,int * scoreP2, char * scoreP2Text)$/;"	f	typeref:typename:void
+ResetData	main.c	/^int ResetData(SDL_Rect *ball, Speed *currentBallSpeed, float *ballBoost,char * playerState$/;"	f	typeref:typename:int
 CreateFont	main.c	/^int CreateFont(TTF_Font **font, unsigned int fontSize)$/;"	f	typeref:typename:int

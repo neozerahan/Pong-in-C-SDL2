@@ -226,6 +226,18 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    //Set Window Icon...
+    SDL_Surface *winIconSurface = SDL_LoadBMP("../Resources/icon.bmp");
+
+    if(winIconSurface == NULL)
+    {
+        printf("Unable to load the game icon!\n");
+        return 1;
+    }
+
+    SDL_SetWindowIcon(window, winIconSurface);
+    SDL_FreeSurface(winIconSurface);
+
     //-------------------------------------------------------------------------------------------//
     //                                          FONT
     //-------------------------------------------------------------------------------------------//
